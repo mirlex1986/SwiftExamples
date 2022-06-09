@@ -1,0 +1,127 @@
+
+import HealthKit
+
+class HealthStore {
+    
+    var healthStore: HKHealthStore?
+    var query: HKStatisticsCollectionQuery?
+    
+    init() {
+        if HKHealthStore.isHealthDataAvailable() {
+            healthStore = HKHealthStore()
+        }
+    }
+    
+    func readBodyMass(completion: @escaping ((_ bodyMass: Double?, _ date: Date?) -> Void)) {
+        guard let healthStore = self.healthStore else { return }
+        
+        let bodyMassType = HKSampleType.quantityType(forIdentifier: .bodyMass)!
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
+        
+        let query = HKSampleQuery(sampleType: bodyMassType,
+                                  predicate: nil,
+                                  limit: 1,
+                                  sortDescriptors: [sortDescriptor]) { (query, results, error) in
+            
+            if let result = results?.last as? HKQuantitySample {
+                let bodyMassKg = result.quantity.doubleValue(for: HKUnit.gramUnit(with: .kilo))
+                completion(bodyMassKg, result.endDate)
+            }
+        }
+        
+        healthStore.execute(query)
+    }
+    
+    func readBodyHeight(completion: @escaping ((_ bodyMass: Double?, _ date: Date?) -> Void)) {
+        guard let healthStore = self.healthStore else { return }
+        
+        let bodyHeightType = HKSampleType.quantityType(forIdentifier: .height)!
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
+        
+        let query = HKSampleQuery(sampleType: bodyHeightType,
+                                  predicate: nil,
+                                  limit: 1,
+                                  sortDescriptors: [sortDescriptor]) { (query, results, error) in
+            
+            if let result = results?.last as? HKQuantitySample {
+                let bodyMassHeight = result.quantity.doubleValue(for: HKUnit.meterUnit(with: .centi))
+                completion(bodyMassHeight, result.endDate)
+            }
+        }
+        healthStore.execute(query)
+    }
+    
+    func saveBodyMassIndex(bmi: Double) {
+        guard let healthStore = self.healthStore else { return }
+        
+        let bmiType = HKQuantityType.quantityType(forIdentifier: .bodyMassIndex)
+        let quanitytUnit = HKUnit.count()
+        let quantityAmount = HKQuantity(unit: quanitytUnit, doubleValue: bmi)
+        let sample = HKQuantitySample(type: bmiType!, quantity: quantityAmount, start: Date(), end: Date())
+        
+        healthStore.save(sample) { success, error in
+            if (error != nil) {
+                print("Error: \(String(describing: error))")
+            }
+            if success {
+                print("Saved: \(success)")
+            }
+        }
+    }
+    
+    func saveBodyMass(bodyMass: Double) {
+        guard let healthStore = self.healthStore else { return }
+        
+        let quantityType = HKObjectType.quantityType(forIdentifier: .bodyMass)!
+        let date = Date()
+        let bodyMass = HKQuantitySample(type: quantityType,
+                                        quantity: HKQuantity.init(unit: HKUnit.gramUnit(with: .kilo), doubleValue: bodyMass),
+                                         start: date,
+                                         end: date)
+        healthStore.save(bodyMass) { success, error in
+            if (error != nil) {
+                print("Error: \(String(describing: error))")
+            }
+            if success {
+                print("Saved: \(success)")
+            }
+        }
+    }
+    
+    func saveBodyHeight(bodyHeight: Double) {
+        guard let healthStore = self.healthStore else { return }
+        
+        let quantityType = HKObjectType.quantityType(forIdentifier: .height)!
+        let quanitytUnit = HKUnit.meterUnit(with: .centi)
+        let quantityAmount = HKQuantity(unit: quanitytUnit, doubleValue: bodyHeight)
+        let date = Date()
+        let bodyHeight = HKQuantitySample(type: quantityType,
+                                          quantity: quantityAmount,
+                                          start: date,
+                                          end: date)
+        healthStore.save(bodyHeight) { success, error in
+            if (error != nil) {
+                print("Error: \(String(describing: error))")
+            }
+            if success {
+                print("Saved: \(success)")
+            }
+        }
+    }
+    
+    func requestAuthorization(completion: @escaping (Bool) -> Void) {
+        let bodyMass = HKQuantityType.quantityType(forIdentifier: HKQuantityTypeIdentifier.bodyMass)!
+        let bodyHeight = HKQuantityType.quantityType(forIdentifier: HKQuantityTypeIdentifier.height)!
+        let bodyMassIndex = HKQuantityType.quantityType(forIdentifier: HKQuantityTypeIdentifier.bodyMassIndex)!
+        let bloodAlcoholContent = HKQuantityType.quantityType(forIdentifier: HKQuantityTypeIdentifier.bloodAlcoholContent)!
+        let numberOfAlcoholicBeverages = HKQuantityType.quantityType(forIdentifier: HKQuantityTypeIdentifier.numberOfAlcoholicBeverages)!
+        
+        guard let healthStore = self.healthStore else { return completion(false) }
+        
+        healthStore.requestAuthorization(toShare: [numberOfAlcoholicBeverages, bloodAlcoholContent, bodyMassIndex, bodyMass, bodyHeight],
+                                         read: [bodyMass, bodyHeight]) { (success, error) in
+            completion(success)
+        }
+    }
+}
+
